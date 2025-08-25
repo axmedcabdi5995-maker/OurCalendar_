@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Our Calendar</title>
+  <meta name="description" content="A tiny invite-only calendar for two." />
+  <style>
+    :root{
+      --bg: #faf9ff;
+      --ink: #0b1020;
+      --muted: #60688c;
+      --card: #ffffff;
+      --ring: rgba(124,58,237,0.45);
+      --primary: #7c3aed;   /* violet */
+      --primary-weak: rgba(124,58,237,0.16);
+      --accent: #ec4899;    /* pink */
+      --accent-weak: rgba(236,72,153,0.14);
+      --danger: #ef4444;
+      --surface: #f3f1ff;
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(9, 12, 30, 0.10);
+    }
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--ink);
+      background:
+        radial-gradient(1100px 800px at 8% -10%, rgba(124,58,237,0.25), transparent 60%),
+        radial-gradient(1000px 700px at 100% 110%, rgba(236,72,153,0.22), transparent 60%),
+        radial-gradient(800px 600px at 50% 40%, rgba(14,165,233,0.16), transparent 60%),
+        var(--bg);
+      min-height: 100dvh;
+      line-height: 1.4;
+    }
+    .shell{
+      width: 100%;
+      max-width: 1000px; margin: 0 auto;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid #ececf4;
+      overflow: hidden;
+      position: relative;
+    }
+    .stripe{
+      height: 4px; width: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent), #14b8a6, #f59e0b, var(--primary));
+      background-size: 300% 100%;
+      animation: slide 8s linear infinite;
+    }
+    @keyframes slide{ 0%{ background-position: 0% 0%; } 100%{ background-position: 300% 0%; } }
+    header{
+      padding: clamp(12px, 3vw, 18px) clamp(14px, 3vw, 22px);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      border-bottom: 1px solid #ececf4;
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(252,252,255,1));
+    }
+    h1{ margin: 0; font-size: clamp(18px, 4vw, 28px); letter-spacing: .2px; color: var(--ink); }
+    .names{
+      font-weight: 800;
+      font-size: clamp(16px, 3.6vw, 26px);
+      color: transparent;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; background-clip: text;
+      cursor: default; user-select: text;
+      text-align: right;
+    }
+    .muted{ color: var(--muted); }
+    .row{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: clamp(12px, 2.5vw, 18px);
+      padding: clamp(12px, 3vw, 18px);
+    }
+    @media (min-width: 860px){
+      .row{ grid-template-columns: 1.4fr 1fr; }
+    }
+
+    /* Calendar */
+    .calendar{
+      background: var(--surface);
+      border: 1px solid #ececf4;
+      border-radius: 14px;
+      padding: clamp(10px, 2.5vw, 16px);
+    }
+    .cal-head{
+      display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: clamp(6px, 2vw, 10px);
+      flex-wrap: wrap;
+    }
+    .cal-head .when{ font-weight: 800; letter-spacing: .2px; font-size: clamp(14px, 3.5vw, 18px); }
+    .btn{
+      appearance:none; border: 1px solid #e7e2ff; background:#fff; padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.2vw, 14px);
+      border-radius:10px; cursor:pointer; transition: transform .06s ease, box-shadow .15s ease;
+      box-shadow: 0 3px 10px rgba(124,58,237,0.08);
+      font-size: clamp(13px, 3.5vw, 14px);
+      touch-action: manipulation;
+    }
+    .btn.primary{ background: linear-gradient(90deg, var(--primary), var(--accent)); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(124,58,237,0.35); }
+    .btn.warn{ background: #ef4444; color:#fff; border-color: transparent; }
+    .btn.ghost{ background: #fff; }
+    .btn:focus{ outline: 3px solid var(--ring); outline-offset: 1px; }
+    .btn:hover{ transform: translateY(-1px); }
+    @media (max-width: 480px){
+      .stack.buttons .btn{ width: 100%; }
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: clamp(6px, 1.8vw, 8px);
+    }
+    .dname{ font-size: clamp(10px, 2.6vw, 12px); text-transform: uppercase; color: var(--muted); text-align:center; padding:6px 0; }
+    .cell{
+      background:#fff; border: 1px solid #eae6ff; border-radius:12px;
+      min-height: clamp(64px, 12vw, 90px);
+      padding: clamp(8px, 2.2vw, 10px);
+      position:relative; cursor:pointer;
+      transition: transform .06s ease, box-shadow .15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cell:active{ transform: scale(0.98); }
+    .cell:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px rgba(124,58,237,0.12); }
+    .cell.other{ background: #faf7ff; color:#9aa0c0; }
+    .cell .day{ font-weight: 700; font-size: clamp(13px, 3.2vw, 14px); }
+    .cell.today{ border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary-weak); }
+    .cell.selected{ box-shadow: inset 0 0 0 2px var(--accent-weak); border-color: var(--accent); animation: pulse 0.9s ease; }
+    @keyframes pulse{ 0%{ box-shadow: 0 0 0 0 rgba(236,72,153,0.35); } 100%{ box-shadow: 0 0 0 12px rgba(236,72,153,0); } }
+    .dots{ position:absolute; left:8px; bottom:8px; display:flex; gap:4px; }
+    .dot{ width:7px; height:7px; border-radius:999px; background: linear-gradient(90deg, var(--primary), var(--accent)); }
+    .empty{ color:#94a3b8; font-size:clamp(11px, 3vw, 12px); }
+
+    /* Sidebar / form */
+    .panel{
+      border: 1px solid #ececf4; border-radius:14px; padding: clamp(12px, 3vw, 16px); background:#fff;
+      display:flex; flex-direction:column; gap:10px; box-shadow: 0 6px 18px rgba(124,58,237,0.08); position: relative;
+    }
+    label{ font-size: clamp(12px, 3vw, 13px); color: var(--muted); display:block; margin-bottom:6px; }
+    input[type="text"], input[type="time"]{
+      width:100%; padding: clamp(12px, 3.2vw, 14px) 12px; border-radius:12px; border:1px solid #e7e2ff; background:#fff; color:var(--ink);
+      box-shadow: inset 0 1px 0 rgba(124,58,237,0.06); font-size: clamp(14px, 3.8vw, 16px);
+    }
+    .stack{ display:flex; gap:10px; flex-wrap: wrap; }
+    .stack.buttons{ margin-top: 4px; }
+    .event{ border:1px solid #e7e2ff; border-radius:12px; padding:10px 12px; background:#fff; }
+    .flash{ position:absolute; inset:0;
+      background: radial-gradient(600px 200px at 10% 0%, rgba(124,58,237,0.15), transparent 60%), radial-gradient(600px 200px at 100% 100%, rgba(236,72,153,0.15), transparent 60%);
+      pointer-events:none; opacity:0; transition: opacity .4s ease; }
+    .flash.show{ opacity:1; }
+
+    footer{
+      padding: clamp(12px, 3vw, 16px) clamp(14px, 3vw, 18px);
+      border-top:1px solid #ececf4; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    }
+    .ps{ font-weight:600; background: linear-gradient(90deg, var(--primary), var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; font-size: clamp(12px, 3.4vw, 14px); }
+    .privacy{ font-size: clamp(12px, 3.4vw, 14px); }
+  
+/* --- First-visit overlay styles (added) --- */
+#welcomeOverlay {
+  position: fixed; inset: 0;
+  background: radial-gradient(1200px 800px at 20% -10%, rgba(124,58,237,0.35), transparent 60%),
+              radial-gradient(1000px 700px at 100% 110%, rgba(236,72,153,0.30), transparent 60%),
+              rgba(5,8,20,0.85);
+  display: none; 
+  align-items: center; justify-content: center; 
+  z-index: 9999;
+}
+.welcome-inner{
+  position: relative;
+  width: min(920px, 92vw);
+  aspect-ratio: 16/9;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+}
+#welcomeCanvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.welcome-copy{ position: absolute; inset: 0; display:grid; place-items:center; text-align:center; padding: 6vw; }
+.welcome-title{
+  font-size: clamp(22px, 5.5vw, 48px);
+  font-weight: 900;
+  letter-spacing: .4px;
+  margin: 0 0 10px 0;
+  background: linear-gradient(90deg, #a78bfa, #f472b6, #22d3ee, #f59e0b);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.welcome-sub{ color: #e5e7eb; font-size: clamp(14px, 3.2vw, 18px); }
+.welcome-actions{
+  position:absolute; bottom: clamp(12px, 3.2vw, 20px); left: 50%; transform: translateX(-50%);
+  display:flex; gap: 10px; flex-wrap:wrap;
+}
+.welcome-btn{
+  appearance:none; border:none; border-radius: 999px;
+  padding: 12px 18px; font-weight:700; cursor:pointer;
+  color:#0b1020; background:#fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+.welcome-skip{ background: transparent; color: #e5e7eb; border: 1px solid rgba(255,255,255,0.4); }
+
+
+/* --- Intro controls (added) --- */
+#introReplay{
+  position: fixed; right: 14px; bottom: 14px; z-index: 9999;
+  background: linear-gradient(90deg,#7c3aed,#ec4899);
+  color:#fff; border:none; border-radius:999px; padding:10px 14px; font-weight:700; cursor:pointer;
+  box-shadow: 0 8px 24px rgba(124,58,237,.35);
+}
+#introReplay:hover{ transform: translateY(-1px); }
+
+</style>
+</head>
+<body>
+
+<!-- First-visit overlay (added) -->
+<div id="welcomeOverlay" role="dialog" aria-modal="true" aria-label="Welcome">
+  <div class="welcome-inner">
+    <canvas id="welcomeCanvas"></canvas>
+    <div class="welcome-copy">
+      <div>
+        <h2 class="welcome-title">The beginning of our calendar, Atika</h2>
+        <div class="welcome-sub">Hand-coded by Ahmed</div>
+      </div>
+    </div>
+    <div class="welcome-actions">
+      <button class="welcome-btn" id="welcomeStart">Begin</button>
+      <button class="welcome-btn welcome-skip" id="welcomeSkip">Skip</button>
+    </div>
+  </div>
+</div>
+
+  <div class="shell">
+    <div class="stripe"></div>
+    <header>
+      <h1>Our Calendar</h1>
+      <div class="names" id="names" aria-label="Names">Ahmed & Atika</div>
+    </header>
+
+    <div class="row">
+      <!-- Calendar -->
+      <section class="calendar" aria-label="Monthly calendar">
+        <div class="cal-head">
+          <div class="stack buttons">
+            <button class="btn ghost" id="prev" aria-label="Previous month">◀</button>
+            <button class="btn ghost" id="today">Today</button>
+            <button class="btn ghost" id="next" aria-label="Next month">▶</button>
+          </div>
+          <div class="when" id="title"></div>
+        </div>
+        <div class="grid" id="dnames"></div>
+        <div class="grid" id="cells"></div>
+      </section>
+
+      <!-- Plan panel -->
+      <aside class="panel">
+        <div class="flash" id="flash"></div>
+        <div class="muted" id="selectedLabel">Select a date</div>
+        <div>
+          <label for="time">Time</label>
+          <input id="time" type="time" />
+        </div>
+        <div>
+          <label for="place">Place</label>
+          <input id="place" type="text" placeholder="Coffee, dinner, walk…" />
+        </div>
+        <div>
+          <label for="note">Note</label>
+          <input id="note" type="text" placeholder="Optional" />
+        </div>
+        <div class="stack buttons">
+          <button class="btn primary" id="add">Add to this day</button>
+          <a class="btn" id="dlIcs" download="our-date.ics" href="#">Download .ics</a>
+          <button class="btn warn" id="clear">Clear day</button>
+        </div>
+        <div id="events"></div>
+      </aside>
+    </div>
+
+    <footer>
+      <div class="ps">P.S. If you smiled, dinner's on me when you are back</div>
+      <div class="muted privacy">Private. Only you and I can see it ;)</div>
+    </footer>
+  </div>
+
+  <script>
+    // Helpers
+    const qs = s => document.querySelector(s);
+    const dnames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const title = qs('#title');
+    const cellsWrap = qs('#cells');
+    const dnamesWrap = qs('#dnames');
+
+    const time = qs('#time');
+    const place = qs('#place');
+    const note = qs('#note');
+    const addBtn = qs('#add');
+    const dlIcs = qs('#dlIcs');
+    const clearBtn = qs('#clear');
+    const eventsBox = qs('#events');
+    const selectedLabel = qs('#selectedLabel');
+    const flash = qs('#flash');
+
+    const stateKey = 'our-calendar-v5';
+
+    let view = new Date(); // month in view
+    view.setDate(1);
+    let selected = new Date(); // selected day
+    let data = { events: {} };
+
+    // Load saved
+    try{
+      const saved = JSON.parse(localStorage.getItem(stateKey) || 'null');
+      if (saved){ data = Object.assign(data, saved); }
+      if (data.selected) selected = new Date(data.selected);
+    }catch(e){}
+
+    function save(){
+      localStorage.setItem(stateKey, JSON.stringify({
+        events: data.events,
+        selected: selected.toISOString()
+      }));
+    }
+
+    // Render weekday names
+    dnamesWrap.innerHTML = dnames.map(n=>`<div class="dname">${n}</div>`).join('');
+
+    function ymd(d){
+      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
+
+    function parseYmdLocal(key){
+      const [y,m,d] = key.split('-').map(Number);
+      return new Date(y, m-1, d, 12, 0, 0, 0); // noon local to avoid tz issues
+    }
+
+    function renderCalendar(){
+      const month = view.getMonth();
+      const year = view.getFullYear();
+      title.textContent = new Intl.DateTimeFormat(undefined, { month:'long', year:'numeric'}).format(view);
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const prevDays = new Date(year, month, 0).getDate();
+
+      const cells = [];
+      for (let i=firstDay-1; i>=0; i--){
+        const d = new Date(year, month-1, prevDays - i);
+        cells.push(cellHtml(d, true));
+      }
+      for (let i=1; i<=daysInMonth; i++){
+        const d = new Date(year, month, i);
+        cells.push(cellHtml(d, false));
+      }
+      while (cells.length % 7 !== 0){
+        const d = new Date(year, month+1, (cells.length % 7) + 1);
+        cells.push(cellHtml(d, true));
+      }
+      cellsWrap.innerHTML = cells.join('');
+      bindCellClicks();
+      renderRightPanel();
+    }
+
+    function cellHtml(d, other){
+      const key = ymd(d);
+      const today = ymd(new Date()) === key;
+      const isSel = ymd(selected) === key;
+      const dots = (data.events[key]?.length || 0);
+      return `<div class="cell ${other?'other':''} ${today?'today':''} ${isSel?'selected':''}" data-date="${key}">
+        <div class="day">${d.getDate()}</div>
+        <div class="dots">${'.'.repeat(Math.min(dots,4)).split('').map(()=>'<span class="dot"></span>').join('')}</div>
+      </div>`;
+    }
+
+    function bindCellClicks(){
+      document.querySelectorAll('.cell').forEach(el => {
+        el.addEventListener('click', (e) => {
+          const k = el.getAttribute('data-date');
+          selected = parseYmdLocal(k); // local parse fixes off-by-one on mobile
+          renderCalendar();
+          // focus ring flash on selection for accessibility
+          el.style.outline = '3px solid ' + getComputedStyle(document.documentElement).getPropertyValue('--ring');
+          setTimeout(()=> el.style.outline = 'none', 200);
+        }, { passive: true });
+      });
+      qs('#prev').onclick = ()=>{ view.setMonth(view.getMonth()-1); renderCalendar(); };
+      qs('#next').onclick = ()=>{ view.setMonth(view.getMonth()+1); renderCalendar(); };
+      qs('#today').onclick = ()=>{ view = new Date(); view.setDate(1); selected = new Date(); renderCalendar(); };
+    }
+
+    function renderRightPanel(){
+      const key = ymd(selected);
+      selectedLabel.textContent = new Intl.DateTimeFormat(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric'}).format(selected);
+      const items = data.events[key] || [];
+      if (!items.length){
+        eventsBox.innerHTML = `<div class="event empty">No plans yet. Add one!</div>`;
+      }else{
+        eventsBox.innerHTML = items.map((ev, idx)=>{
+          return `<div class="event">
+            <strong>${ev.time || 'TBD'} — ${ev.place || 'Somewhere nice'}</strong>
+            <div class="muted">${ev.note || ''}</div>
+            <div class="stack buttons" style="margin-top:8px">
+              <button class="btn" data-ics="${idx}">.ics</button>
+              <button class="btn warn" data-del="${idx}">Delete</button>
+            </div>
+          </div>`;
+        }).join('');
+        eventsBox.querySelectorAll('[data-del]').forEach(b=> b.onclick = ()=>{
+          const i = +b.getAttribute('data-del');
+          data.events[key].splice(i,1);
+          if (!data.events[key].length) delete data.events[key];
+          save(); renderCalendar();
+        });
+        eventsBox.querySelectorAll('[data-ics]').forEach(b=> b.onclick = ()=>{
+          const i = +b.getAttribute('data-ics');
+          const ev = data.events[key][i];
+          const file = makeIcsBlob({title:'Date', date:key, time: ev.time || '18:00', place: ev.place, note: (ev.note || '')});
+          const url = URL.createObjectURL(file);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'our-date.ics'; a.click();
+          setTimeout(()=>URL.revokeObjectURL(url), 4000);
+        });
+      }
+      save();
+    }
+
+    function addEvent(){
+      const key = ymd(selected);
+      const ev = { time: time.value || '18:00', place: place.value || '', note: note.value || '' };
+      data.events[key] = data.events[key] || [];
+      data.events[key].push(ev);
+      time.value = ''; place.value=''; note.value='';
+      save(); renderCalendar();
+      flash.classList.add('show');
+      setTimeout(()=> flash.classList.remove('show'), 300);
+    }
+
+    function makeIcsBlob({title, date, time, place, note}){
+      const [y,m,d] = date.split('-').map(Number);
+      const [hh,mm] = (time||'18:00').split(':').map(Number);
+      const dtstart = new Date(Date.UTC(y, m-1, d, hh, mm, 0));
+      const dtend = new Date(dtstart.getTime() + 60*60*1000);
+      const pad = n=>String(n).padStart(2,'0');
+      const fmt = dt=> dt.getUTCFullYear()+pad(dt.getUTCMonth()+1)+pad(dt.getUTCDate())+'T'+pad(dt.getUTCHours())+pad(dt.getUTCMinutes())+'00Z';
+      const escape = s=>(s||'').replace(/[,\n]/g, m => m==','?'\\,':'\\n');
+      const ics = [
+        'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Our Calendar//EN','BEGIN:VEVENT',
+        'UID:'+Math.random().toString(36).slice(2),
+        'DTSTAMP:'+fmt(new Date()), 'DTSTART:'+fmt(dtstart), 'DTEND:'+fmt(dtend),
+        'SUMMARY:'+escape(title||'Date'),
+        'LOCATION:'+escape(place||'TBD'),
+        'DESCRIPTION:'+escape(note||'First date'),
+        'END:VEVENT','END:VCALENDAR'
+      ].join('\\r\\n');
+      return new Blob([ics], {type:'text/calendar'});
+    }
+
+    addBtn.onclick = addEvent;
+    clearBtn.onclick = ()=>{
+      const key = ymd(selected);
+      if (confirm('Clear all events for this day?')){
+        delete data.events[key]; save(); renderCalendar();
+      }
+    };
+
+    renderCalendar();
+  
+// --- First-visit overlay logic + fireworks (added) ---
+(function(){
+  const FLAG = 'oc_first_visit';
+  try {
+    const seen = localStorage.getItem(FLAG);
+    const overlay = document.getElementById('welcomeOverlay');
+    const canvas = document.getElementById('welcomeCanvas');
+    const startBtn = document.getElementById('welcomeStart');
+    const skipBtn = document.getElementById('welcomeSkip');
+
+    if (!seen && overlay && canvas){
+      overlay.style.display = 'flex';
+      // Fireworks animation
+      const ctx = canvas.getContext('2d');
+      let W, H, raf, running = true;
+      const DPR = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      function resize(){
+        W = canvas.clientWidth; H = canvas.clientHeight;
+        canvas.width = W * DPR; canvas.height = H * DPR;
+        ctx.setTransform(DPR,0,0,DPR,0,0);
+      }
+      window.addEventListener('resize', resize, {passive:true});
+      resize();
+
+      const sparks = [];
+      function burst(x,y,colors){
+        const n = 90 + Math.random()*60;
+        for (let i=0;i<n;i++){
+          const ang = Math.random()*Math.PI*2;
+          const spd = 2 + Math.random()*4;
+          sparks.push({
+            x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: 60 + Math.random()*30,
+            color: colors[Math.floor(Math.random()*colors.length)], alpha: 1, size: 2 + Math.random()*2
+          });
+        }
+      }
+      function loop(){
+        if (!running) return;
+        ctx.fillStyle = 'rgba(10, 12, 28, 0.25)';
+        ctx.fillRect(0,0,W,H);
+        for (let i=sparks.length-1; i>=0; i--){
+          const p = sparks[i];
+          p.vy += 0.02; // gravity
+          p.x += p.vx; p.y += p.vy;
+          p.life -= 1; p.alpha = Math.max(0, p.life/90);
+          ctx.globalAlpha = p.alpha;
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+          if (p.life <= 0) sparks.splice(i,1);
+        }
+        ctx.globalAlpha = 1;
+        raf = requestAnimationFrame(loop);
+      }
+      const palette = ['#a78bfa','#f472b6','#22d3ee','#f59e0b','#34d399','#60a5fa'];
+      const seed = ()=>{ for (let i=0;i<4;i++) burst(Math.random()*W, Math.random()*H*0.8, palette); };
+      seed(); setInterval(seed, 1200); loop();
+
+      function close(){
+        running = false; cancelAnimationFrame(raf);
+        overlay.style.display = 'none'; localStorage.setItem(FLAG, '1');
+      }
+      startBtn?.addEventListener('click', close);
+      skipBtn?.addEventListener('click', close);
+      window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); });
+      setTimeout(()=>{ if (overlay.style.display !== 'none') close(); }, 6000);
+    }
+  }catch(e){ /* non-blocking */ }
+})();
+</script>
+
+<button id="introReplay" title="Replay intro">Replay intro</button>
+
+
+<!-- Intro control script (added) -->
+<script>
+(function(){
+  const FLAG = 'oc_first_visit';
+  function showIntro(){
+    const overlay = document.getElementById('welcomeOverlay');
+    if (!overlay){ return; }
+    overlay.style.display = 'flex';
+  }
+  function ensureIntroHooks(){
+    const overlay = document.getElementById('welcomeOverlay');
+    if (!overlay){ return; }
+    const startBtn = document.getElementById('welcomeStart');
+    const skipBtn = document.getElementById('welcomeSkip');
+    const canvas = document.getElementById('welcomeCanvas');
+    if (canvas && canvas.getContext){
+      const ctx = canvas.getContext('2d'); let W,H,raf,running=true;
+      const DPR = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      function resize(){ W=canvas.clientWidth; H=canvas.clientHeight; canvas.width=W*DPR; canvas.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+      window.addEventListener('resize', resize, {passive:true}); resize();
+      const sparks=[]; 
+      function burst(x,y,colors){ const n=90+Math.random()*60; for(let i=0;i<n;i++){ const ang=Math.random()*Math.PI*2; const spd=2+Math.random()*4; sparks.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:60+Math.random()*30,color:colors[(Math.random()*colors.length)|0],alpha:1,size:2+Math.random()*2}); } }
+      function loop(){ if(!running) return; ctx.fillStyle='rgba(10,12,28,0.25)'; ctx.fillRect(0,0,W,H); for(let i=sparks.length-1;i>=0;i--){ const p=sparks[i]; p.vy+=0.02; p.x+=p.vx; p.y+=p.vy; p.life-=1; p.alpha=Math.max(0,p.life/90); ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill(); if(p.life<=0) sparks.splice(i,1);} ctx.globalAlpha=1; raf=requestAnimationFrame(loop); }
+      const palette=['#a78bfa','#f472b6','#22d3ee','#f59e0b','#34d399','#60a5fa'];
+      function seed(){ for(let i=0;i<4;i++) burst(Math.random()*W, Math.random()*H*0.8, palette); }
+      seed(); setInterval(seed,1200); loop();
+      function close(){ running=false; cancelAnimationFrame(raf); overlay.style.display='none'; localStorage.setItem(FLAG,'1'); }
+      startBtn && startBtn.addEventListener('click', close);
+      skipBtn && skipBtn.addEventListener('click', close);
+      window.addEventListener('keydown', e => { if(e.key==='Escape') close(); });
+      setTimeout(()=>{ if(overlay.style.display!=='none') close(); }, 6000);
+    }
+  }
+  function init(){
+    const params = new URLSearchParams(location.search);
+    const force = params.get('intro') === '1';
+    if (force || !localStorage.getItem(FLAG)){ showIntro(); }
+    ensureIntroHooks();
+    const replay = document.getElementById('introReplay');
+    if (replay){
+      replay.addEventListener('click', ()=>{
+        localStorage.removeItem(FLAG);
+        showIntro();
+        ensureIntroHooks();
+      });
+    }
+  }
+  if (document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', init); }
+  else { init(); }
+})();
+</script>
+
+</body>
+</html>
